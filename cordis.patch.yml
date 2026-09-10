@@ -1,0 +1,35 @@
+# dsh-policy-strict-gate bundle patch.
+#
+# Turns `strict_check` and the failure journal from tools the model *may* call
+# into policy the harness *enforces*. Three gates, each independently
+# switchable:
+#
+#   repeatedFailure  - the same failure signature recurring in one session
+#                      injects a notice into the next model step
+#   criticalPaths    - a write/edit under a protected glob is refused until a
+#                      Lean specification for that path has been checked and
+#                      accepted; the refusal carries the current diagnostics so
+#                      the refusal is actionable rather than opaque
+#   postWriteSyntax  - every write/edit is followed by the language's own
+#                      syntax check, and the diagnostics are injected
+#
+# Install with: dsh plugin --profile <name> add D:/deepseek_harness/dsh-policy-strict-gate
+#
+# Config (all optional):
+#   criticalPaths    - glob list, e.g. ['src/core/**', '*.lean']. Empty disables
+#                      the critical-path gate entirely (the other two still run).
+#   protectedTools   - tools whose calls are treated as writes (default:
+#                      ['write', 'edit', 'str_replace_editor'])
+#   specGlobs        - globs identifying a spec for a protected target (default:
+#                      the target with '.lean' appended, and *.spec.lean)
+#   repeatThreshold  - identical failure signatures before the notice (default 3)
+#   repeatCooldown   - further notices every N repeats after the first (default 3)
+#   postWriteSyntax  - check after each write (default true)
+#   maxDiagnostics   - diagnostics quoted in one notice (default 5)
+#   timeoutMs        - per-check wall clock (default 60000)
+#   exposeStatusTool - register `strict_gate_status` for introspection (default true)
+- insert:
+    - id: policy-strict-gate
+      name: '@dsh-external/dsh-policy-strict-gate'
+      config:
+        criticalPaths: []
