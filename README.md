@@ -1,9 +1,21 @@
+<div align="center">
+
 # Strict Gate
 
 **A tool the model must remember to call is a tool it will skip exactly when it matters most.**
 
 A DeepSeek Harness host plugin that turns `strict_check` and the failure journal
 from things the agent *may* use into policy the harness *enforces*.
+
+[![License: MIT](https://img.shields.io/badge/license-MIT-3DA639.svg)](LICENSE)
+[![DeepSeek Harness plugin](https://img.shields.io/badge/DeepSeek%20Harness-tool%20plugin-4D6BFE.svg)](#install)
+[![version](https://img.shields.io/github/package-json/v/catsenior507/dsh-policy-strict-gate?color=4D6BFE)](package.json)
+[![node](https://img.shields.io/badge/node-%3E%3D20-3DA639.svg)](package.json)
+[![stars](https://img.shields.io/github/stars/catsenior507/dsh-policy-strict-gate?color=4D6BFE)](https://github.com/catsenior507/dsh-policy-strict-gate/stargazers)
+
+[English](README.md) · [简体中文](README.zh.md)
+
+</div>
 
 ---
 
@@ -15,8 +27,8 @@ use them away from the agent.
 That is not a criticism of the agent — it is a statement about when checks get
 skipped. Self-discipline fails precisely at the moments that matter: when the
 model is confident, when it is rushing, and when it is already looping. Those are
-the moments a check is worth most and the moments it is least likely to be
-invoked voluntarily.
+the moments a check is worth most and the moments it is least likely to be invoked
+voluntarily.
 
 There is a second reason, and it is the one that convinced me to build this: **a
 check whose output lands in a tool result can be skimmed. A check whose refusal
@@ -34,14 +46,13 @@ queues a notice naming the failure class, the shipped remediation, and the
 instruction to change something. After that it speaks again every
 `repeatCooldown` repeats, so a long loop does not flood the context.
 
-The harness already does this for *byte-identical* calls. This extends it to
-calls that differ in whitespace or paths but fail for the same reason — which is
-what "大量相同类型的错误" actually looks like in a transcript.
+The harness already does this for *byte-identical* calls. This extends it to calls
+that differ in whitespace or paths but fail for the same reason.
 
-Counted on `tools/result` rather than `tools/post-execute` deliberately: the
-former fires for **every** settled outcome, including the pipeline failures that
-bypass post-execute — a denied call, an unknown tool, a call refused by this very
-gate. A model hammering a refused call is exactly the loop worth breaking.
+Counted on `tools/result` rather than `tools/post-execute` deliberately: the former
+fires for **every** settled outcome, including the pipeline failures that bypass
+post-execute — a denied call, an unknown tool, a call refused by this very gate. A
+model hammering a refused call is exactly the loop worth breaking.
 
 ### 2. Critical paths
 
@@ -74,10 +85,57 @@ This is the cheap tier that pays for itself most often: it catches the edit that
 broke parsing **at the step that broke it**, instead of three commands later via
 an unrelated failure.
 
+<a id="install"></a>
+## Install
+
+The plugin is installed as a package into a dsh **profile**. `dsh plugin` forwards
+to `pnpm` inside the profile directory, so any spec pnpm accepts works.
+
+```bash
+# from GitHub (the published form)
+dsh plugin --profile web add github:catsenior507/dsh-policy-strict-gate
+
+# a local checkout, while developing
+dsh plugin --profile web add /absolute/path/to/dsh-policy-strict-gate
+```
+
+`web` is the shipped GUI profile; substitute `headless`, `sdk`, `acp`, or your own
+profile name. On Windows, use forward slashes in a path.
+
+For the critical-path and post-write gates, also install the checker it reasons
+with:
+
+```bash
+dsh plugin --profile web add github:catsenior507/dsh-tool-strict-check
+```
+
+The gate locates that package by walking the DSH profile directories, so it works
+whether the two are linked or installed separately — and if it is absent, the gate
+says so and stands the two checking gates down rather than guessing.
+
+Then **restart the host** and confirm with:
+
+```
+strict_gate_status action=status
+```
+
+### What install does *not* do
+
+- **No build step** — the published JavaScript is the source; no `prepare` script
+  runs.
+- **No dependencies** — `dependencies` and `peerDependencies` are both empty.
+- **`strict-check` is optional at load time.** Without it you still get the
+  repeated-failure gate; you lose the other two.
+
+Node.js 20 or newer.
+
 ## Enable the critical-path gate
 
 It ships **off**, because the glob list is a statement about *your* code that no
 plugin can guess. Until you set it, the other two gates still run.
+
+`dsh plugin add` already inserted the plugin row. Add the list to that row's
+`config` in the profile's `cordis.patch.yml`:
 
 ```yaml
 - insert:
@@ -106,19 +164,9 @@ For a protected target `src/core/x.ts`, the gate looks for, in order:
 2. `src/core/x.ts.lean`
 3. `src/core/specs/x.lean`
 
-A `.lean` file is **never** refused by the gate, whatever the globs say — a spec
-is how the gate is satisfied, so refusing to let one be written would make the
-gate unsatisfiable.
-
-## Requirements
-
-- **`dsh-tool-strict-check`** must be installed for the critical-path and
-  post-write gates. Without it they report themselves off and the repeated-failure
-  gate still runs. The gate locates it by walking the DSH profile directories, so
-  it works whether the two are linked or installed separately.
-- **Lean 4.33.1 or newer** for the critical-path gate to ever accept anything. A
-  toolchain below that floor reports `unsafe-toolchain` and the gate will not
-  treat it as verification.
+A `.lean` file is **never** refused by the gate, whatever the globs say — a spec is
+how the gate is satisfied, so refusing to let one be written would make the gate
+unsatisfiable.
 
 ## Introspection
 
@@ -138,16 +186,16 @@ this tool exists to make the difference visible.
 
 ## Development
 
-```powershell
+```bash
 npm test        # 72 tests; the integration ones run the real Lean kernel
 ```
 
-The integration tests drive the **real** collaborators rather than a stub,
-because the failure they guard against is silent: two plugins that disagree about
-what "verified" means would leave the gate refusing writes the model was told
-were fine. `test/activation.test.js` goes further and drives the **real cordis
-waterfalls**, because a listener registered on the wrong event name, or one that
-never calls `next()`, throws nothing — it just makes the policy silently absent.
+The integration tests drive the **real** collaborators rather than a stub, because
+the failure they guard against is silent: two plugins that disagree about what
+"verified" means would leave the gate refusing writes the model was told were fine.
+`test/activation.test.js` goes further and drives the **real cordis waterfalls**,
+because a listener registered on the wrong event name, or one that never calls
+`next()`, throws nothing — it just makes the policy silently absent.
 
 Four bugs worth remembering, all caught by tests rather than by review:
 
@@ -162,13 +210,11 @@ Four bugs worth remembering, all caught by tests rather than by review:
   continuation, so a reload disposes the fiber before the collaborator import
   resolves; registering an effect then threw `cannot create effect on inactive
   context` **inside a floating promise**. That is a host-level fault caused by a
-  plugin being unloaded, and it is now guarded by asking the framework whether
-  the fiber is still active.
-- **A repeat notice cannot attach to the call that failed.** `tools/result` has
-  no decision channel, so the notice is queued and delivered on the *next* call's
-  `pre-execute`. Correct, but easy to mistake for a bug: a notice produced inside
-  `post-execute` instead rides that accepted result and arrives one step earlier.
-  Both paths have their own test.
+  plugin being unloaded, now guarded by asking the framework whether the fiber is
+  still active.
+- **A repeat notice cannot attach to the call that failed.** `tools/result` has no
+  decision channel, so the notice is queued and delivered on the *next* call's
+  `pre-execute`. Correct, but easy to mistake for a bug.
 
 ### Delivery, precisely
 
@@ -178,9 +224,9 @@ Four bugs worth remembering, all caught by tests rather than by review:
 | `tools/post-execute` (a write, a check) | that result's `additionalContexts` | none |
 | a refusal | the `deny` reason text | immediate |
 
-A denial has no `additionalContexts`, so anything queued for that step is
-appended to the reason string instead — otherwise a refusal would silently
-swallow a repeat notice produced by the very loop the refusal is part of.
+A denial has no `additionalContexts`, so anything queued for that step is appended
+to the reason string instead — otherwise a refusal would silently swallow a repeat
+notice produced by the very loop the refusal is part of.
 
 | File | Role |
 | --- | --- |
